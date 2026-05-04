@@ -1,0 +1,14 @@
+{
+  "name": "criciq-root",
+  "version": "1.0.0",
+  "scripts": {
+    "install:all": "npm install --prefix client && npm install --prefix server && pip install -r ml/requirements.txt",
+    "dev:client": "npm run dev --prefix client",
+    "dev:server": "npm start --prefix server",
+    "dev:ml": "cd ml && py -3.10 -m uvicorn main:app --reload --port 8000",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\" \"npm run dev:ml\""
+  },
+  "dependencies": {
+    "concurrently": "^8.2.1"
+  }
+}

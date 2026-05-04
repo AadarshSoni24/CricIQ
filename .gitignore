@@ -1,0 +1,30 @@
+# Node.js
+node_modules/
+.env
+
+# Build outputs
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data and Models (Optional: Comment out if you want to track these)
+*.csv
+*.pkl
+*.png
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
