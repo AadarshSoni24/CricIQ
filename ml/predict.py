@@ -12,6 +12,9 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 router = APIRouter()
 
@@ -21,11 +24,39 @@ MODEL_DIR = os.path.join(BASE_DIR, "models")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # ── Load models & data at startup ─────────────────────────
+FALLBACK_FEATURES = [
+    "toss_bat_first","toss_winner_is_team1","avg_1st_innings","bat_first_win_pct",
+    "pitch_dna_enc","team1_form5","team2_form5","team1_form10","team2_form10",
+    "team1_h2h_winrate","t1_team_sr","t2_team_sr","t1_team_sr_powerplay",
+    "t2_team_sr_powerplay","t1_team_sr_death","t2_team_sr_death","t1b_team_economy",
+    "t2b_team_economy","t1b_team_econ_powerplay","t2b_team_econ_powerplay",
+    "t1b_team_econ_death","t2b_team_econ_death","t1_bat_win_pct","t2_bat_win_pct",
+    "t1_chase_win_pct","t2_chase_win_pct","t1_xi_bat_sr","t2_xi_bat_sr",
+    "t1_xi_pp_sr","t2_xi_pp_sr","t1_xi_death_sr","t2_xi_death_sr",
+    "t1_xi_bowl_econ","t2_xi_bowl_econ","t1_xi_pp_econ","t2_xi_pp_econ",
+    "t1_xi_death_econ","t2_xi_death_econ","t1_matchup_adv","t2_matchup_adv",
+    "t1_venue_sr","t2_venue_sr","t1_death_bat_spec","t2_death_bat_spec",
+    "t1_death_bowl_spec","t2_death_bowl_spec","t1_allrounders","t2_allrounders",
+    "t1_player_form","t2_player_form","dew_factor","t1_win_streak","t2_win_streak",
+    "t1_home","t2_home","season_year",
+    "diff_xi_bat_sr","diff_xi_bowl_econ","diff_player_form","diff_win_streak",
+    "diff_form5","diff_form10","diff_matchup_adv","diff_cap_winrate",
+    "diff_xi_pp_sr","diff_xi_death_sr","diff_xi_death_econ"
+]
+
 try:
     xgb_model = joblib.load(os.path.join(MODEL_DIR, "xgb_model_55.pkl"))
     lgb_model = joblib.load(os.path.join(MODEL_DIR, "lgb_model_55.pkl"))
     model_meta = joblib.load(os.path.join(MODEL_DIR, "model_meta_55.pkl"))
-    feature_cols = model_meta.get("feature_cols", [])
+    feature_cols = (
+        model_meta.get("features") or
+        model_meta.get("feature_cols") or
+        model_meta.get("feature_names") or
+        model_meta.get("columns") or
+        FALLBACK_FEATURES
+    )
+    print(f"[DEBUG] model_meta keys: {list(model_meta.keys())}")
+    print(f"[DEBUG] feature_cols count: {len(feature_cols)}")
     threshold = model_meta.get("best_threshold", 0.5)
     use_ensemble = model_meta.get("use_ensemble", True)
     print(f"[OK] Loaded ensemble model with {len(feature_cols)} features")
@@ -126,6 +157,42 @@ def get_venue_info(venue_name: str) -> dict:
     }
 
 
+def get_match_insights(team1, team2, venue_name):
+    """Generate human-readable insights for why a team might win."""
+    insights = []
+    try:
+        matches = pd.read_csv(os.path.join(DATA_DIR, "matches.csv"))
+        # 1. Team performance at this venue
+        v_matches = matches[matches['venue'].str.contains(venue_name.split(',')[0], case=False, na=False)]
+        if not v_matches.empty:
+            t1_wins = len(v_matches[v_matches['winner'] == team1])
+            t2_wins = len(v_matches[v_matches['winner'] == team2])
+            if t1_wins > t2_wins:
+                insights.append(f"🏟️ {team1} Fortress: They have won {t1_wins} matches at this venue compared to {t2_wins} for {team2}.")
+            elif t2_wins > t1_wins:
+                insights.append(f"🏟️ {team2} Fortress: They have won {t2_wins} here compared to {t1_wins} for {team1}.")
+
+        # 2. Player Performance on this ground (using auction profiles or master features)
+        insights.append(f"📈 Ground Stats: Avg 1st innings here is {get_venue_info(venue_name)['avg_1st_innings']} runs.")
+        
+        # 3. Recent Momentum (Last 7)
+        all_team_matches = matches[(matches['team1'].isin([team1, team2])) | (matches['team2'].isin([team1, team2]))].sort_values('date', ascending=False)
+        t1_recent = all_team_matches[(all_team_matches['team1']==team1) | (all_team_matches['team2']==team1)].head(7)
+        t2_recent = all_team_matches[(all_team_matches['team1']==team2) | (all_team_matches['team2']==team2)].head(7)
+        
+        t1_form = len(t1_recent[t1_recent['winner']==team1])
+        t2_form = len(t2_recent[t2_recent['winner']==team2])
+        
+        if t1_form > t2_form:
+            insights.append(f"🔥 Momentum: {team1} is in better form with {t1_form}/7 recent wins.")
+        elif t2_form > t1_form:
+            insights.append(f"🔥 Momentum: {team2} is peaking with {t2_form}/7 recent wins.")
+
+    except Exception as e:
+        print(f"Insight error: {e}")
+    return insights
+
+
 @router.post("/predict", response_model=PredictResponse)
 async def predict_match(req: PredictRequest):
     """Run match winner prediction using XGB+LGB ensemble."""
@@ -133,6 +200,7 @@ async def predict_match(req: PredictRequest):
         raise HTTPException(status_code=503, detail="ML models not loaded")
 
     vinfo = get_venue_info(req.venue)
+    insights = get_match_insights(req.team1, req.team2, req.venue)
     pitch_map = {"batting_friendly": 2, "balanced": 1, "bowling_friendly": 0}
 
     # Build feature vector
@@ -150,7 +218,13 @@ async def predict_match(req: PredictRequest):
         "season_year": req.season_year,
     }
 
-    row_dict = {f: base.get(f, 0) for f in feature_cols}
+    # After building base dict, fill missing features with defaults
+    row_dict = {}
+    for f in feature_cols:
+        if f in base:
+            row_dict[f] = base[f]
+        else:
+            row_dict[f] = 0  # default for unknown features
     features = pd.DataFrame([row_dict])
 
     # Ensemble prediction
@@ -197,4 +271,5 @@ async def predict_match(req: PredictRequest):
         confidence=round(confidence, 2),
         shapFactors=shap_factors,
         venueInfo=vinfo,
+        insights=insights,
     )

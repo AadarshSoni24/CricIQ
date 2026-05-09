@@ -63,3 +63,13 @@ exports.getPlayerMatchups = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getPlayerList = async (req, res, next) => {
+  try {
+    const mlRes = await axios.get(`${ML_URL}/ml/scout/players`);
+    res.json(mlRes.data);
+  } catch (err) {
+    if (err.response) return res.status(err.response.status).json(err.response.data);
+    next(err);
+  }
+};

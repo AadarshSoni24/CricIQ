@@ -24,8 +24,15 @@ export default function SearchBar({ placeholder = 'Search players...', onSelect 
   const handleSelect = (player) => {
     setQuery('');
     setOpen(false);
-    if (onSelect) onSelect(player);
-    else navigate(`/player/${encodeURIComponent(player.name)}`);
+    if (onSelect) {
+      onSelect(player);
+    } else {
+      if (player.role === 'Team') {
+        navigate(`/predict?team=${encodeURIComponent(player.name)}`);
+      } else {
+        navigate(`/player/${encodeURIComponent(player.name)}`);
+      }
+    }
   };
 
   return (
@@ -38,8 +45,11 @@ export default function SearchBar({ placeholder = 'Search players...', onSelect 
           placeholder={placeholder}
           value={query}
           onChange={e => setQuery(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          onFocus={() => {
+            if (results.length > 0) setOpen(true);
+          }}
+          // Use a longer delay or a close button to avoid focus jump
+          onBlur={() => setTimeout(() => setOpen(false), 300)}
         />
         {loading && <span className="search-spinner">⏳</span>}
       </div>

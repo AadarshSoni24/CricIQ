@@ -59,6 +59,20 @@ export default function Predictor() {
             <h3 className="section-title" style={{ marginTop: 32 }}>Venue Context</h3>
             <KeyPlayersCard venueInfo={result.venueInfo} />
 
+            {result.insights && result.insights.length > 0 && (
+              <div className="card" style={{ marginTop: 24, background: 'rgba(27, 79, 216, 0.05)', borderColor: 'var(--accent-blue)' }}>
+                <h4 style={{ color: 'var(--accent-blue)', marginBottom: 12 }}>🧠 Key Insights & Factors</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {result.insights.map((insight, i) => (
+                    <div key={i} style={{ fontSize: 14, color: 'var(--text-primary)', display: 'flex', gap: 10 }}>
+                      <span style={{ opacity: 0.8 }}>•</span>
+                      <span>{insight}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <FactorsCard
               shapFactors={result.shapFactors}
               team1={result.team1}

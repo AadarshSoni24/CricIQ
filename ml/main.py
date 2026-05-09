@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from predict import router as predict_router
 from scout import router as scout_router
 from auction import router as auction_router
+from matchup import router as matchup_router
 
 app = FastAPI(
     title="CricIQ ML Service",
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(predict_router, prefix="/ml")
 app.include_router(scout_router, prefix="/ml")
 app.include_router(auction_router, prefix="/ml")
+app.include_router(matchup_router, prefix="/ml")
 
 
 @app.get("/")

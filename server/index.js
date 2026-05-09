@@ -15,6 +15,7 @@ const predictRoutes = require('./routes/predict');
 const playerRoutes = require('./routes/players');
 const auctionRoutes = require('./routes/auction');
 const searchRoutes = require('./routes/search');
+const matchupRoutes = require('./routes/matchup');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -39,6 +40,7 @@ app.use('/api/predict', predictRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/auction', auctionRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/matchup', matchupRoutes);
 
 // ── Static data endpoints ─────────────────────────────────
 const TEAMS = [

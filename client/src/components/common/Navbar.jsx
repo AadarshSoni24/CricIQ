@@ -20,6 +20,9 @@ export default function Navbar() {
           <NavLink to="/auction" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <span className="nav-icon">💰</span> Auction
           </NavLink>
+          <NavLink to="/matchup" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span className="nav-icon">⚔️</span> Matchup
+          </NavLink>
         </div>
       </div>
     </nav>

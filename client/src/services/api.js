@@ -23,6 +23,8 @@ export const searchPlayers = (q, role = '') =>
 export const getPlayer = (name) =>
   API.get(`/players/${encodeURIComponent(name)}`).then(r => r.data);
 
+export const getPlayerList = () => API.get('/players/list').then(r => r.data);
+
 export const getPlayerVenues = (name) =>
   API.get(`/players/${encodeURIComponent(name)}/venues`).then(r => r.data);
 
@@ -37,5 +39,9 @@ export const getAuctionRecommendation = (data) =>
 // ── Search ──────────────────────────────────────────────
 export const globalSearch = (q, role = '', min_score = 0) =>
   API.get('/search', { params: { q, role, min_score } }).then(r => r.data);
+
+// ── Matchup ──────────────────────────────────────────────
+export const getMatchup = (batter, bowler) =>
+  API.post('/matchup', { batter, bowler }).then(r => r.data);
 
 export default API;
