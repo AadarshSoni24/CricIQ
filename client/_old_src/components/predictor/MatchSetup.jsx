@@ -31,34 +31,55 @@ export default function MatchSetup({ onPredict, loading }) {
       <div className="setup-row">
         <div className="form-group">
           <label className="form-label">🔵 Team 1</label>
-          <select className="select" value={team1} onChange={e => setTeam1(e.target.value)}
-            style={{ borderColor: `${getTeamColor(team1)}55` }}>
+          <input 
+            list="team1-list"
+            className="input" 
+            placeholder="Type or select Team 1"
+            value={team1} 
+            onChange={(e) => setTeam1(e.target.value)}
+            style={{ borderColor: `${getTeamColor(team1)}55` }}
+          />
+          <datalist id="team1-list">
             {teams.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-          </select>
+          </datalist>
         </div>
         <div className="vs-badge">VS</div>
         <div className="form-group">
           <label className="form-label">🔴 Team 2</label>
-          <select className="select" value={team2} onChange={e => setTeam2(e.target.value)}
-            style={{ borderColor: `${getTeamColor(team2)}55` }}>
+          <input 
+            list="team2-list"
+            className="input" 
+            placeholder="Type or select Team 2"
+            value={team2} 
+            onChange={(e) => setTeam2(e.target.value)}
+            style={{ borderColor: `${getTeamColor(team2)}55` }}
+          />
+          <datalist id="team2-list">
             {team2Options.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-          </select>
+          </datalist>
         </div>
       </div>
 
       <div className="form-group">
         <label className="form-label">🏟️ Venue</label>
-        <select className="select" value={venue} onChange={e => setVenue(e.target.value)}>
+        <input 
+          list="venue-list"
+          className="input" 
+          placeholder="Type or select venue"
+          value={venue} 
+          onChange={(e) => setVenue(e.target.value)}
+        />
+        <datalist id="venue-list">
           {venues.map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
+        </datalist>
       </div>
 
       <div className="setup-row">
         <div className="form-group">
           <label className="form-label">🪙 Toss won by</label>
           <select className="select" value={tossWinner} onChange={e => setTossWinner(e.target.value)}>
-            <option value={team1}>{team1}</option>
-            <option value={team2}>{team2}</option>
+            <option value={team1}>{team1 || 'Select Team 1 first'}</option>
+            <option value={team2}>{team2 || 'Select Team 2 first'}</option>
           </select>
         </div>
         <div className="form-group">

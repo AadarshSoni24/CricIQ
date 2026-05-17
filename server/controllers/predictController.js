@@ -15,34 +15,34 @@ exports.predict = async (req, res, next) => {
       return res.status(400).json({ error: 'team1, team2, and venue are required' });
     }
 
+    const normalizedDecision = (tossDecision && tossDecision.toLowerCase() === 'bowl') ? 'field' : 'bat';
+
     // Call FastAPI ML service
     const mlResponse = await axios.post(`${ML_URL}/ml/predict`, {
       team1,
       team2,
       venue,
       toss_winner: tossWinner || team1,
-      toss_decision: tossDecision || 'bat',
+      toss_decision: normalizedDecision,
     });
 
     const result = mlResponse.data;
 
     // Save to MongoDB (non-blocking)
-    try {
-      await Prediction.create({
-        team1: result.team1,
-        team2: result.team2,
-        venue: result.venue,
-        tossWinner: tossWinner,
-        tossDecision: tossDecision,
-        predictedWinner: result.predictedWinner,
-        team1WinProb: result.team1WinProb,
-        team2WinProb: result.team2WinProb,
-        confidence: result.confidence,
-        shapFactors: result.shapFactors,
-      });
-    } catch (dbErr) {
+    Prediction.create({
+      team1: result.team1,
+      team2: result.team2,
+      venue: result.venue,
+      tossWinner: tossWinner,
+      tossDecision: tossDecision,
+      predictedWinner: result.predictedWinner,
+      team1WinProb: result.team1WinProb,
+      team2WinProb: result.team2WinProb,
+      confidence: result.confidence,
+      shapFactors: result.shapFactors,
+    }).catch(dbErr => {
       console.warn('Could not save prediction to DB:', dbErr.message);
-    }
+    });
 
     res.json(result);
   } catch (err) {

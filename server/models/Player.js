@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const playerSchema = new mongoose.Schema({
   name: { type: String, required: true, index: true },
+  uuid: { type: String, unique: true, sparse: true, index: true },
+  aliases: [String],
   role: { type: String, enum: ['batter', 'bowler', 'allrounder', 'wk'], default: 'batter' },
   battingStyle: String,
   bowlingStyle: String,

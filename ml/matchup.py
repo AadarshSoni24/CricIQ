@@ -26,22 +26,35 @@ class MatchupRequest(BaseModel):
     batter: str
     bowler: str
 
+from scout import PLAYER_REGISTRY
+
+def get_csv_names(primary_name):
+    for uid, info in PLAYER_REGISTRY.items():
+        if info["primary_name"] == primary_name or primary_name in info["names"]:
+            return info["names"]
+    return {primary_name}
+
 @router.post("/matchup")
 async def get_matchup(req: MatchupRequest):
     batter, bowler = req.batter, req.bowler
     
+    bat_names = get_csv_names(batter)
+    bowl_names = get_csv_names(bowler)
+
     # Get aggregated summary from matrix
     summary = {}
     if not matchup_matrix.empty:
-        row = matchup_matrix[(matchup_matrix["batter"] == batter) & (matchup_matrix["bowler"] == bowler)]
+        row = matchup_matrix[matchup_matrix["batter"].isin(bat_names) & matchup_matrix["bowler"].isin(bowl_names)]
         if not row.empty:
             summary = row.iloc[0].to_dict()
+            summary["batter"] = batter
+            summary["bowler"] = bowler
     
     # Get ball-by-ball history from deliveries
     if deliveries.empty:
         raise HTTPException(500, "Deliveries data not loaded")
     
-    h2h = deliveries[(deliveries["batter"] == batter) & (deliveries["bowler"] == bowler)].copy()
+    h2h = deliveries[deliveries["batter"].isin(bat_names) & deliveries["bowler"].isin(bowl_names)].copy()
     
     if h2h.empty:
         # Even if not in matrix (which might have a threshold), we check deliveries
