@@ -369,15 +369,15 @@ with tab2:
         bs = get_player_bat_stats(selected_batter)
         if bs:
             st.markdown(f"#### {selected_batter} — Batting")
-           runs_col = 'runs' if 'runs' in bs else 'bat_runs' if 'bat_runs' in bs else list(bs.keys())[1]
-           sr_col   = 'sr'   if 'sr'   in bs else 'bat_sr'   if 'bat_sr'   in bs else 'strike_rate'
-           avg_col  = 'avg'  if 'avg'  in bs else 'bat_avg'  if 'bat_avg'  in bs else 'average'
+            runs_col = 'runs' if 'runs' in bs else 'bat_runs' if 'bat_runs' in bs else list(bs.keys())[1]
+            sr_col   = 'sr'   if 'sr'   in bs else 'bat_sr'   if 'bat_sr'   in bs else 'strike_rate'
+            avg_col  = 'avg'  if 'avg'  in bs else 'bat_avg'  if 'bat_avg'  in bs else 'average'
 
-st.metric("Total IPL runs", f"{int(bs.get(runs_col, 0)):,}")
+            st.metric("Total IPL runs", f"{int(bs.get(runs_col, 0)):,}")
 
-m1, m2c = st.columns(2)
-m1.metric("Overall SR",  f"{bs.get(sr_col,  0):.1f}")
-m2c.metric("Overall Avg", f"{bs.get(avg_col, 0):.1f}")
+            m1, m2c = st.columns(2)
+            m1.metric("Overall SR",  f"{bs.get(sr_col,  0):.1f}")
+            m2c.metric("Overall Avg", f"{bs.get(avg_col, 0):.1f}")
 
             # Phase breakdown chart
             phases = ['Powerplay', 'Middle', 'Death']

@@ -31,7 +31,7 @@ def build_registry():
         print(f"[WARN] JSON data dir not found: {JSON_DATA_DIR}")
         return
     
-    print("🔄 Building Player Registry from JSONs...")
+    print("[INFO] Building Player Registry from JSONs...")
     count = 0
     for f in os.listdir(JSON_DATA_DIR):
         if f.endswith(".json"):
@@ -53,7 +53,7 @@ def build_registry():
             PLAYER_REGISTRY[uuid]["primary_name"] = full_name
             PLAYER_REGISTRY[uuid]["names"].add(full_name)
 
-    print(f"✅ Registry built: {len(PLAYER_REGISTRY)} players from {count} files")
+    print(f"[OK] Registry built: {len(PLAYER_REGISTRY)} players from {count} files")
 
 build_registry()
 

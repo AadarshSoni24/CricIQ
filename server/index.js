@@ -21,7 +21,17 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ── Middleware ─────────────────────────────────────────────
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'] }));
+const clientUrl = process.env.CLIENT_URL;
+const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'];
+if (clientUrl) {
+  clientUrl.split(',').forEach(url => {
+    const trimmed = url.trim();
+    if (trimmed && !allowedOrigins.includes(trimmed)) {
+      allowedOrigins.push(trimmed);
+    }
+  });
+}
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -63,7 +73,10 @@ app.get('/api/teams', (req, res) => res.json(TEAMS));
 
 app.get('/api/venues', (req, res) => {
   try {
-    const csvPath = path.join(__dirname, '../venue_features.csv');
+    let csvPath = path.join(__dirname, 'venue_features.csv');
+    if (!fs.existsSync(csvPath)) {
+      csvPath = path.join(__dirname, '../venue_features.csv');
+    }
     const data = fs.readFileSync(csvPath, 'utf8');
     const lines = data.split('\n').filter(line => line.trim() !== '');
     

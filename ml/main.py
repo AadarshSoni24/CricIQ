@@ -8,6 +8,7 @@ Endpoints:
   POST /ml/auction/price → bid range prediction
 """
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from predict import router as predict_router
@@ -22,9 +23,14 @@ app = FastAPI(
 )
 
 # CORS — allow Express backend
+express_url = os.getenv("EXPRESS_API_URL")
+origins = ["http://localhost:5000", "http://127.0.0.1:5000"]
+if express_url:
+    origins.extend([o.strip() for o in express_url.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5000", "http://127.0.0.1:5000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

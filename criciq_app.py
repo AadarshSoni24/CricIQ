@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import warnings
 warnings.filterwarnings('ignore')
+import os
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
@@ -202,22 +203,33 @@ st.markdown("""
 # ── Load data & model ────────────────────────────────────────
 @st.cache_resource
 def load_all():
-    # Try new 55-feature model first, fallback to original
+    # Try calibrated v2 model first, fallback to 55-feature model, then original
     try:
-        model        = joblib.load('xgb_model_55.pkl')
-        feature_cols = joblib.load('feature_cols_55.pkl')
-        meta         = joblib.load('model_meta_55.pkl')
-        model_label  = f"XGBoost + LightGBM Ensemble · {len(feature_cols)} features"
-        lgb_model    = joblib.load('lgb_model_55.pkl') if meta.get('use_ensemble') else None
-        threshold    = meta.get('best_threshold', 0.5)
-    except:
-        model        = joblib.load('xgb_match_predictor.pkl')
-        feature_cols = ['toss_bat_first','toss_winner_is_team1','avg_1st_innings',
-                        'bat_first_win_pct','pitch_dna_enc','team1_form5','team2_form5',
-                        'team1_form10','team2_form10','team1_h2h_winrate','season_year']
-        lgb_model    = None
-        threshold    = 0.5
-        model_label  = "XGBoost · 11 features"
+        if os.path.exists('xgb_model_v2.pkl'):
+            model        = joblib.load('xgb_model_v2.pkl')
+            feature_cols = joblib.load('feature_cols_55.pkl')
+            meta         = joblib.load('model_meta_v2.pkl')
+            model_label  = f"Calibrated Ensemble (v2) · {len(feature_cols)} features"
+            lgb_model    = joblib.load('lgb_model_v2.pkl') if meta.get('use_ensemble') else None
+            threshold    = meta.get('best_threshold', 0.5)
+        else:
+            raise FileNotFoundError("v2 model files not found in root")
+    except Exception:
+        try:
+            model        = joblib.load('xgb_model_55.pkl')
+            feature_cols = joblib.load('feature_cols_55.pkl')
+            meta         = joblib.load('model_meta_55.pkl')
+            model_label  = f"XGBoost + LightGBM Ensemble · {len(feature_cols)} features"
+            lgb_model    = joblib.load('lgb_model_55.pkl') if meta.get('use_ensemble') else None
+            threshold    = meta.get('best_threshold', 0.5)
+        except Exception:
+            model        = joblib.load('xgb_match_predictor.pkl')
+            feature_cols = ['toss_bat_first','toss_winner_is_team1','avg_1st_innings',
+                            'bat_first_win_pct','pitch_dna_enc','team1_form5','team2_form5',
+                            'team1_form10','team2_form10','team1_h2h_winrate','season_year']
+            lgb_model    = None
+            threshold    = 0.5
+            model_label  = "XGBoost · 11 features"
 
     venue_f  = pd.read_csv('venue_features.csv')
     bat_f    = pd.read_csv('player_batting_features.csv')

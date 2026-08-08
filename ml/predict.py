@@ -45,9 +45,19 @@ FALLBACK_FEATURES = [
 ]
 
 try:
-    xgb_model = joblib.load(os.path.join(MODEL_DIR, "xgb_model_55.pkl"))
-    lgb_model = joblib.load(os.path.join(MODEL_DIR, "lgb_model_55.pkl"))
-    model_meta = joblib.load(os.path.join(MODEL_DIR, "model_meta_55.pkl"))
+    # Try loading calibrated v2 models first
+    if os.path.exists(os.path.join(MODEL_DIR, "xgb_model_v2.pkl")):
+        xgb_model = joblib.load(os.path.join(MODEL_DIR, "xgb_model_v2.pkl"))
+        lgb_model = joblib.load(os.path.join(MODEL_DIR, "lgb_model_v2.pkl"))
+        model_meta = joblib.load(os.path.join(MODEL_DIR, "model_meta_v2.pkl"))
+        print("[OK] Loaded Calibrated v2 Models")
+    else:
+        # Fallback to the 55-feature models
+        xgb_model = joblib.load(os.path.join(MODEL_DIR, "xgb_model_55.pkl"))
+        lgb_model = joblib.load(os.path.join(MODEL_DIR, "lgb_model_55.pkl"))
+        model_meta = joblib.load(os.path.join(MODEL_DIR, "model_meta_55.pkl"))
+        print("[OK] Loaded 55-feature models (fallback)")
+
     feature_cols = (
         model_meta.get("features") or
         model_meta.get("feature_cols") or
@@ -77,32 +87,97 @@ except Exception as e:
     venue_features = pd.DataFrame()
     master_features = pd.DataFrame()
 
-# ── SHAP human-readable labels ────────────────────────────
-SHAP_LABELS = {
-    "toss_bat_first": "Toss: chose to bat first",
-    "toss_winner_is_team1": "Toss won by team 1",
-    "avg_1st_innings": "Venue avg 1st innings score",
-    "bat_first_win_pct": "Bat first win % at venue",
-    "pitch_dna_enc": "Pitch type (batting/bowling)",
-    "team1_form5": "Team 1 — last 5 match form",
-    "team2_form5": "Team 2 — last 5 match form",
-    "team1_form10": "Team 1 — last 10 match form",
-    "team2_form10": "Team 2 — last 10 match form",
-    "team1_h2h_winrate": "Head-to-head win rate",
-    "season_year": "Season year",
-    "t1_xi_bat_sr": "Team 1 XI batting SR",
-    "t2_xi_bat_sr": "Team 2 XI batting SR",
-    "t1_xi_death_econ": "Team 1 death bowling economy",
-    "t2_xi_death_econ": "Team 2 death bowling economy",
-    "t1_matchup_adv": "Team 1 bowling matchup advantage",
-    "t2_matchup_adv": "Team 2 bowling matchup advantage",
-    "dew_factor": "Dew factor at venue",
-    "t1_home": "Team 1 home advantage",
-    "t2_home": "Team 2 home advantage",
-    "points_diff": "Points table gap",
-    "diff_xi_bat_sr": "Batting SR differential",
-    "diff_xi_bowl_econ": "Bowling economy differential",
-}
+def get_human_label(feat: str, team1: str, team2: str) -> str:
+    feat_lower = feat.lower()
+    labels = {
+        "toss_bat_first": "Toss Winner chose to bat first",
+        "toss_winner_is_team1": f"Toss won by {team1}",
+        "avg_1st_innings": "Venue average 1st innings score",
+        "bat_first_win_pct": "Historical bat-first win rate at venue",
+        "pitch_dna_enc": "Pitch DNA (batting vs bowling friendliness)",
+        
+        "team1_form5": f"{team1} recent form (last 5 matches)",
+        "team2_form5": f"{team2} recent form (last 5 matches)",
+        "team1_form10": f"{team1} long-term form (last 10 matches)",
+        "team2_form10": f"{team2} long-term form (last 10 matches)",
+        "team1_h2h_winrate": "Head-to-head win rate",
+        
+        "t1_team_sr": f"{team1} batting strike rate (overall)",
+        "t2_team_sr": f"{team2} batting strike rate (overall)",
+        "t1_team_sr_powerplay": f"{team1} batting strike rate (Powerplay)",
+        "t2_team_sr_powerplay": f"{team2} batting strike rate (Powerplay)",
+        "t1_team_sr_death": f"{team1} batting strike rate (Death overs)",
+        "t2_team_sr_death": f"{team2} batting strike rate (Death overs)",
+        
+        "t1b_team_economy": f"{team1} bowling economy rate (overall)",
+        "t2b_team_economy": f"{team2} bowling economy rate (overall)",
+        "t1b_team_econ_powerplay": f"{team1} bowling economy rate (Powerplay)",
+        "t2b_team_econ_powerplay": f"{team2} bowling economy rate (Powerplay)",
+        "t1b_team_econ_death": f"{team1} bowling economy rate (Death overs)",
+        "t2b_team_econ_death": f"{team2} bowling economy rate (Death overs)",
+        
+        "t1_bat_win_pct": f"{team1} win rate when batting first",
+        "t2_bat_win_pct": f"{team2} win rate when batting first",
+        "t1_chase_win_pct": f"{team1} win rate when chasing",
+        "t2_chase_win_pct": f"{team2} win rate when chasing",
+        
+        "t1_xi_bat_sr": f"{team1} playing XI batting strike rate",
+        "t2_xi_bat_sr": f"{team2} playing XI batting strike rate",
+        "t1_xi_pp_sr": f"{team1} playing XI Powerplay batting strike rate",
+        "t2_xi_pp_sr": f"{team2} playing XI Powerplay batting strike rate",
+        "t1_xi_death_sr": f"{team1} playing XI death batting strike rate",
+        "t2_xi_death_sr": f"{team2} playing XI death batting strike rate",
+        
+        "t1_xi_bowl_econ": f"{team1} playing XI bowling economy rate",
+        "t2_xi_bowl_econ": f"{team2} playing XI bowling economy rate",
+        "t1_xi_pp_econ": f"{team1} playing XI Powerplay bowling economy",
+        "t2_xi_pp_econ": f"{team2} playing XI Powerplay bowling economy",
+        "t1_xi_death_econ": f"{team1} playing XI death bowling economy",
+        "t2_xi_death_econ": f"{team2} playing XI death bowling economy",
+        
+        "t1_matchup_adv": f"{team1} player matchup advantage",
+        "t2_matchup_adv": f"{team2} player matchup advantage",
+        
+        "t1_venue_sr": f"{team1} scoring speed at venue",
+        "t2_venue_sr": f"{team2} scoring speed at venue",
+        
+        "t1_death_bat_spec": f"{team1} death overs batting depth",
+        "t2_death_bat_spec": f"{team2} death overs batting depth",
+        "t1_death_bowl_spec": f"{team1} death overs bowling specialty",
+        "t2_death_bowl_spec": f"{team2} death overs bowling specialty",
+        
+        "t1_allrounders": f"All-rounders depth for {team1}",
+        "t2_allrounders": f"All-rounders depth for {team2}",
+        
+        "t1_player_form": f"{team1} average player form",
+        "t2_player_form": f"{team2} average player form",
+        
+        "dew_factor": "Dew factor impact",
+        "t1_win_streak": f"{team1} winning streak",
+        "t2_win_streak": f"{team2} winning streak",
+        "t1_home": f"Home advantage for {team1}",
+        "t2_home": f"Home advantage for {team2}",
+        
+        "diff_xi_bat_sr": "Playing XI batting strike rate difference",
+        "diff_xi_bowl_econ": "Playing XI bowling economy difference",
+        "diff_player_form": "Average player form difference",
+        "diff_win_streak": "Win streak difference",
+        "diff_form5": "Last 5 matches form difference",
+        "diff_form10": "Last 10 matches form difference",
+        "diff_matchup_adv": "Head-to-head matchup superiority",
+        "diff_cap_winrate": "Captain win rate difference",
+        "diff_xi_pp_sr": "Powerplay batting strike rate difference",
+        "diff_xi_death_sr": "Death overs batting strike rate difference",
+        "diff_xi_death_econ": "Death overs bowling economy difference",
+    }
+    if feat_lower in labels:
+        return labels[feat_lower]
+    
+    clean_feat = feat.replace("t1b_", f"{team1} bowling ").replace("t2b_", f"{team2} bowling ")
+    clean_feat = clean_feat.replace("t1_", f"{team1} ").replace("t2_", f"{team2} ")
+    clean_feat = clean_feat.replace("team1_", f"{team1} ").replace("team2_", f"{team2} ")
+    clean_feat = clean_feat.replace("_", " ").strip().title()
+    return clean_feat
 
 
 # ── Request / Response Models ─────────────────────────────
@@ -124,6 +199,8 @@ class ShapFactor(BaseModel):
     factor: str
     impact: float
     plainText: str
+    impactPct: Optional[float] = None
+    favorsTeam: Optional[str] = None
 
 
 class PredictResponse(BaseModel):
@@ -136,6 +213,7 @@ class PredictResponse(BaseModel):
     confidence: float
     shapFactors: List[ShapFactor]
     venueInfo: dict
+    insights: Optional[List[str]] = []
 
 
 def get_venue_info(venue_name: str) -> dict:
@@ -273,21 +351,64 @@ async def predict_match(req: PredictRequest):
     shap_factors = []
     try:
         import shap
-        explainer = shap.TreeExplainer(xgb_model)
+        from feature_explanations import humanize_shap
+
+        # CalibratedClassifierCV wraps the estimator. TreeExplainer needs the raw tree booster.
+        base_xgb = xgb_model
+        if hasattr(xgb_model, "calibrated_classifiers_") and len(xgb_model.calibrated_classifiers_) > 0:
+            inner_est = xgb_model.calibrated_classifiers_[0].estimator
+            if hasattr(inner_est, "estimator"):
+                base_xgb = inner_est.estimator
+            else:
+                base_xgb = inner_est
+
+        explainer = shap.TreeExplainer(base_xgb)
         sv = explainer.shap_values(features)
         shap_vals = sv[0] if isinstance(sv, list) else sv[0]
-        pairs = sorted(zip(feature_cols, shap_vals), key=lambda x: abs(x[1]), reverse=True)
+        
+        # Translate SHAP values using feature_explanations module
+        raw_expected_val = float(explainer.expected_value) if hasattr(explainer, "expected_value") else 0.0
+        if isinstance(raw_expected_val, list):
+            raw_expected_val = raw_expected_val[0]
 
-        for feat, val in pairs[:10]:
-            label = SHAP_LABELS.get(feat, feat.replace("_", " ").title())
-            direction = f"favours {req.team1}" if val > 0 else f"favours {req.team2}"
+        humanized = humanize_shap(
+            shap_values=shap_vals,
+            feature_names=feature_cols,
+            team1_name=req.team1,
+            team2_name=req.team2,
+            base_value=raw_expected_val
+        )
+
+        # Take top 6-8 reasons, sorted by absolute impact
+        for item in humanized[:8]:
+            factor_idx = feature_cols.index(item["factor"])
+            raw_val = float(shap_vals[factor_idx])
             shap_factors.append(ShapFactor(
-                factor=feat,
-                impact=round(float(val), 4),
-                plainText=f"{label}: {direction} (impact: {abs(val):.3f})",
+                factor=item["factor"],
+                impact=round(raw_val, 4),
+                plainText=f"{item['reason']} (+{item['impact_pct']:.1f}% win chance)",
+                impactPct=item["impact_pct"],
+                favorsTeam=item["favors_team"]
             ))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[WARN] SHAP humanization error: {e}")
+        # Fallback to the original raw SHAP output in case of error
+        try:
+            explainer = shap.TreeExplainer(base_xgb)
+            sv = explainer.shap_values(features)
+            shap_vals = sv[0] if isinstance(sv, list) else sv[0]
+            pairs = sorted(zip(feature_cols, shap_vals), key=lambda x: abs(x[1]), reverse=True)
+
+            for feat, val in pairs[:8]:
+                label = get_human_label(feat, req.team1, req.team2)
+                direction = f"favours {req.team1}" if val > 0 else f"favours {req.team2}"
+                shap_factors.append(ShapFactor(
+                    factor=feat,
+                    impact=round(float(val), 4),
+                    plainText=f"{label}: {direction} (impact: {abs(val):.3f})",
+                ))
+        except Exception:
+            pass
 
     return PredictResponse(
         team1=req.team1,
@@ -301,3 +422,21 @@ async def predict_match(req: PredictRequest):
         venueInfo=vinfo,
         insights=insights,
     )
+
+
+class LiveSquadRequest(BaseModel):
+    team1: str
+    team2: str
+    match_url: Optional[str] = None
+
+
+@router.post("/live-squad")
+async def get_live_squad(req: LiveSquadRequest):
+    """
+    Scaffolds live/upcoming match squad fetcher.
+    Checks if the toss/playing XI has been announced.
+    If announced, returns the confirmed 11-player squads.
+    If not announced, returns 'XI not confirmed' status.
+    """
+    from live_squad_fetch import fetch_confirmed_xi
+    return fetch_confirmed_xi(req.team1, req.team2, req.match_url)
