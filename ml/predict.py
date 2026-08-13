@@ -296,42 +296,55 @@ async def predict_match(req: PredictRequest):
         "season_year": req.season_year,
     }
 
-    # After building base dict, fill missing features with defaults
+    # Dynamically populate all team1, team2, and differential features from master_features
     try:
         t1_rows = master_features[(master_features['team1'] == req.team1) | (master_features['team2'] == req.team1)]
-        if not t1_rows.empty:
-            last = t1_rows.iloc[-1]
-            is_t1 = (last['team1'] == req.team1)
-            p = "t1_" if is_t1 else "t2_"
-            base["t1_team_sr"] = float(last[f"{p}team_sr"])
-            base["t1_xi_bat_sr"] = float(last[f"{p}xi_bat_sr"])
-            base["t1_xi_bowl_econ"] = float(last[f"{p}xi_bowl_econ"])
-            base["t1_win_streak"] = float(last[f"{p}win_streak"])
-            base["team1_h2h_winrate"] = req.h2h_winrate if req.h2h_winrate else float(last["team1_h2h_winrate" if is_t1 else "team2_h2h_winrate"])
-            
         t2_rows = master_features[(master_features['team1'] == req.team2) | (master_features['team2'] == req.team2)]
-        if not t2_rows.empty:
-            last = t2_rows.iloc[-1]
-            is_t1 = (last['team1'] == req.team2)
-            p = "t1_" if is_t1 else "t2_"
-            base["t2_team_sr"] = float(last[f"{p}team_sr"])
-            base["t2_xi_bat_sr"] = float(last[f"{p}xi_bat_sr"])
-            base["t2_xi_bowl_econ"] = float(last[f"{p}xi_bowl_econ"])
-            base["t2_win_streak"] = float(last[f"{p}win_streak"])
-            
-        base["diff_xi_bat_sr"] = base.get("t1_xi_bat_sr", 130) - base.get("t2_xi_bat_sr", 130)
-        base["diff_xi_bowl_econ"] = base.get("t1_xi_bowl_econ", 8) - base.get("t2_xi_bowl_econ", 8)
-        base["diff_win_streak"] = base.get("t1_win_streak", 0) - base.get("t2_win_streak", 0)
+
+        last_t1 = t1_rows.iloc[-1] if not t1_rows.empty else None
+        is_t1_in_last1 = (last_t1['team1'] == req.team1) if last_t1 is not None else True
+
+        last_t2 = t2_rows.iloc[-1] if not t2_rows.empty else None
+        is_t1_in_last2 = (last_t2['team1'] == req.team2) if last_t2 is not None else True
+
+        for f in feature_cols:
+            if f in base:
+                continue
+            if f.startswith("t1_") and last_t1 is not None:
+                stem = f[3:]
+                col = f"t1_{stem}" if is_t1_in_last1 else f"t2_{stem}"
+                if col in last_t1 and pd.notna(last_t1[col]):
+                    base[f] = float(last_t1[col])
+            elif f.startswith("t1b_") and last_t1 is not None:
+                stem = f[4:]
+                col = f"t1b_{stem}" if is_t1_in_last1 else f"t2b_{stem}"
+                if col in last_t1 and pd.notna(last_t1[col]):
+                    base[f] = float(last_t1[col])
+            elif f.startswith("t2_") and last_t2 is not None:
+                stem = f[3:]
+                col = f"t1_{stem}" if is_t1_in_last2 else f"t2_{stem}"
+                if col in last_t2 and pd.notna(last_t2[col]):
+                    base[f] = float(last_t2[col])
+            elif f.startswith("t2b_") and last_t2 is not None:
+                stem = f[4:]
+                col = f"t1b_{stem}" if is_t1_in_last2 else f"t2b_{stem}"
+                if col in last_t2 and pd.notna(last_t2[col]):
+                    base[f] = float(last_t2[col])
+
+        # Compute all differential features (diff_...) dynamically
+        for f in feature_cols:
+            if f.startswith("diff_"):
+                stem = f[5:]
+                t1v = base.get(f"t1_{stem}") or base.get(f"team1_{stem}") or 0.0
+                t2v = base.get(f"t2_{stem}") or base.get(f"team2_{stem}") or 0.0
+                base[f] = float(t1v) - float(t2v)
     except Exception as e:
         print(f"Feature lookup error: {e}")
 
     row_dict = {}
     for f in feature_cols:
-        if f in base:
-            row_dict[f] = base[f]
-        else:
-            row_dict[f] = 0  # default for unknown features
-    features = pd.DataFrame([row_dict])
+        row_dict[f] = float(base.get(f, 0.0))
+    features = pd.DataFrame([row_dict])[feature_cols]
 
     # Ensemble prediction
     if use_ensemble and lgb_model is not None:
